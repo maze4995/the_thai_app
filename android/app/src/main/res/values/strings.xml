@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- app_name은 build.gradle.kts의 flavor resValue로 정의됩니다 -->
+</resources>
