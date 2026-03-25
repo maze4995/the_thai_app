@@ -12,6 +12,7 @@ import '../services/supabase_service.dart';
 import 'customer_add_screen.dart';
 import 'customer_detail_screen.dart';
 import 'login_screen.dart';
+import 'main_shell.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
