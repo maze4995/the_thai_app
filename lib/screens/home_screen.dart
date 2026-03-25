@@ -581,7 +581,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                     builder: (_) => LoginScreen(
                       onLoginSuccess: () {
                         Navigator.of(context).pushAndRemoveUntil(
-                          MaterialPageRoute(builder: (_) => const MainShell()),
+                          MaterialPageRoute(builder: (_) => MainShell()),
                           (_) => false,
                         );
                       },
