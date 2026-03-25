@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/auth_service.dart';
+import 'main_shell.dart';
 
 class LoginScreen extends StatefulWidget {
   final VoidCallback onLoginSuccess;
@@ -42,7 +43,16 @@ class _LoginScreenState extends State<LoginScreen> {
         _errorMessage = error;
       });
     } else {
-      widget.onLoginSuccess();
+      try {
+        widget.onLoginSuccess();
+      } catch (_) {
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => MainShell()),
+            (_) => false,
+          );
+        }
+      }
     }
   }
 
