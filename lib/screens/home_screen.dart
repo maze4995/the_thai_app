@@ -5,11 +5,13 @@ import 'package:intl/intl.dart';
 
 import '../app_route_observer.dart';
 import '../models/customer.dart';
+import '../services/auth_service.dart';
 import '../services/contact_sync_service.dart';
 import '../services/sms_service.dart';
 import '../services/supabase_service.dart';
 import 'customer_add_screen.dart';
 import 'customer_detail_screen.dart';
+import 'login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -568,6 +570,40 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                   : const Icon(Icons.download_outlined),
             ),
           ],
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            onSelected: (value) async {
+              if (value == 'logout') {
+                await AuthService.signOut();
+                if (!mounted) return;
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(
+                    builder: (_) => LoginScreen(
+                      onLoginSuccess: () {
+                        Navigator.of(context).pushAndRemoveUntil(
+                          MaterialPageRoute(builder: (_) => const MainShell()),
+                          (_) => false,
+                        );
+                      },
+                    ),
+                  ),
+                  (_) => false,
+                );
+              }
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    const Icon(Icons.logout, size: 18, color: Colors.red),
+                    const SizedBox(width: 8),
+                    const Text('로그아웃', style: TextStyle(color: Colors.red)),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ],
       ),
       body: Column(

@@ -10,8 +10,10 @@ import 'app_route_observer.dart';
 import 'models/customer.dart';
 import 'screens/customer_add_screen.dart';
 import 'screens/customer_detail_screen.dart';
+import 'screens/login_screen.dart';
 import 'screens/main_shell.dart';
 import 'screens/reservation_add_screen.dart';
+import 'services/auth_service.dart';
 import 'services/native_call_service.dart';
 import 'services/notification_service.dart';
 import 'services/phone_service.dart';
@@ -322,8 +324,60 @@ class _ThaiAppState extends State<ThaiApp> with WidgetsBindingObserver {
           ),
           useMaterial3: true,
         ),
-        home: const MainShell(),
+        home: const _AuthGate(),
       ),
     );
+  }
+}
+
+// ── 인증 게이트 ──────────────────────────────────────────────────────────────
+
+class _AuthGate extends StatefulWidget {
+  const _AuthGate();
+
+  @override
+  State<_AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<_AuthGate> {
+  bool _loading = true;
+  bool _authenticated = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkSession();
+  }
+
+  Future<void> _checkSession() async {
+    if (AuthService.isLoggedIn) {
+      // 세션은 있지만 storeId가 없으면 로드
+      if (AuthService.storeId == null) {
+        await AuthService.loadStoreId();
+      }
+      if (mounted) setState(() { _loading = false; _authenticated = true; });
+    } else {
+      if (mounted) setState(() { _loading = false; _authenticated = false; });
+    }
+  }
+
+  void _onLoginSuccess() {
+    setState(() => _authenticated = true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF1a1a2e),
+        body: Center(
+          child: CircularProgressIndicator(color: Color(0xFF8B4513)),
+        ),
+      );
+    }
+    if (!_authenticated) {
+      return LoginScreen(onLoginSuccess: _onLoginSuccess);
+    }
+    return const MainShell();
   }
 }

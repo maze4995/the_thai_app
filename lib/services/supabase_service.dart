@@ -4,6 +4,7 @@ import '../constants/service_menu.dart';
 import '../models/customer.dart';
 import '../models/reservation.dart';
 import '../models/visit_history.dart';
+import 'auth_service.dart';
 
 class SupabaseService {
   static SupabaseClient get _client => Supabase.instance.client;
@@ -104,6 +105,7 @@ class SupabaseService {
       'visit_type': _visitTypeFromTime(reservedTime),
       'service_name': serviceName ?? '\uC608\uC57D\uD655\uC815',
       'service_price': 0,
+      if (AuthService.storeId != null) 'store_id': AuthService.storeId,
     });
   }
 
@@ -321,6 +323,7 @@ class SupabaseService {
           'day_visit_count': dayVisitCount,
           'night_visit_count': nightVisitCount,
           'memo': memo,
+          if (AuthService.storeId != null) 'store_id': AuthService.storeId,
         })
         .select()
         .single();
@@ -480,6 +483,7 @@ class SupabaseService {
       'visit_type': visitType,
       'service_name': serviceName,
       'service_price': servicePrice,
+      if (AuthService.storeId != null) 'store_id': AuthService.storeId,
     });
 
     final current = await _client
@@ -590,6 +594,7 @@ class SupabaseService {
       'source': source,
       'memo': memo,
       'coupon_used': couponDeduct,
+      if (AuthService.storeId != null) 'store_id': AuthService.storeId,
     }).select('id').single();
 
     if (customerId == null || current == null) {
@@ -748,8 +753,12 @@ class SupabaseService {
     List<Map<String, dynamic>> rows,
   ) async {
     if (rows.isEmpty) return [];
+    final storeId = AuthService.storeId;
+    final enriched = storeId != null
+        ? rows.map((r) => {...r, 'store_id': storeId}).toList()
+        : rows;
     final response =
-        await _client.from('customers').insert(rows).select();
+        await _client.from('customers').insert(enriched).select();
     return (response as List).map((e) => Customer.fromJson(e)).toList();
   }
 
