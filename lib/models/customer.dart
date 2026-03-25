@@ -1,4 +1,5 @@
 import '../app_config.dart';
+import '../services/auth_service.dart';
 
 class Customer {
   final String id;
@@ -139,7 +140,8 @@ class Customer {
       _ => 'VV',
     };
     final special = couponBalance > 0 ? ',스페셜' : '';
-    return '${AppConfig.contactPrefix}-$grade-$source$special($dayVisitCount)($nightVisitCount)$suffix';
+    final prefix = AuthService.storeName ?? AppConfig.contactPrefix;
+    return '$prefix-$grade-$source$special($dayVisitCount)($nightVisitCount)$suffix';
   }
 
   String get contactLabel {

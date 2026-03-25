@@ -6,6 +6,9 @@ class AuthService {
   /// 현재 로그인된 사용자의 store_id (로그인 후 loadStoreId()로 설정됨)
   static String? storeId;
 
+  /// 소속 매장 이름 (stores.name)
+  static String? storeName;
+
   /// 이메일/비밀번호로 로그인 후 storeId 로드
   static Future<String?> signIn({
     required String email,
@@ -26,7 +29,7 @@ class AuthService {
     }
   }
 
-  /// store_members 에서 store_id 조회 및 저장
+  /// store_members 에서 store_id + stores.name 조회 및 저장
   static Future<String?> loadStoreId() async {
     try {
       final user = _client.auth.currentUser;
@@ -34,7 +37,7 @@ class AuthService {
 
       final rows = await _client
           .from('store_members')
-          .select('store_id')
+          .select('store_id, stores(name)')
           .eq('user_id', user.id)
           .limit(1);
 
@@ -43,14 +46,22 @@ class AuthService {
       }
 
       storeId = rows.first['store_id'] as String;
+      final stores = rows.first['stores'];
+      if (stores is Map) {
+        storeName = stores['name'] as String?;
+      }
       return null; // 성공
     } catch (e) {
       return '매장 정보 로드 오류: $e';
     }
   }
 
+  /// contactPrefix: storeName이 있으면 사용, 없으면 AppConfig.contactPrefix 폴백
+  static String get contactPrefix => storeName ?? '매장';
+
   static Future<void> signOut() async {
     storeId = null;
+    storeName = null;
     await _client.auth.signOut();
   }
 
