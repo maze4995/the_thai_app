@@ -53,6 +53,7 @@ class ImportedCustomerCandidate {
   final int visitCount;
   final int dayVisitCount;
   final int nightVisitCount;
+  final String? memo;
 
   const ImportedCustomerCandidate({
     required this.phone,
@@ -60,6 +61,7 @@ class ImportedCustomerCandidate {
     required this.visitCount,
     required this.dayVisitCount,
     required this.nightVisitCount,
+    this.memo,
   });
 }
 
@@ -165,6 +167,19 @@ class ContactSyncService {
       return null;
     }
 
+    // 메모 추출: 경로명 뒤 콤마~첫 번째 (숫자) 사이의 텍스트
+    // 예: "로드,쿠폰X(0)(1)1234" → memo = "쿠폰X"
+    String? memo;
+    final sourceAlias = _sourceAliases.keys.firstWhere((a) => body.contains(a));
+    final afterSource = body.substring(body.indexOf(sourceAlias) + sourceAlias.length);
+    if (afterSource.startsWith(',')) {
+      final firstParen = afterSource.indexOf('(');
+      if (firstParen > 1) {
+        memo = afterSource.substring(1, firstParen).trim();
+        if (memo.isEmpty) memo = null;
+      }
+    }
+
     final counts = _countPattern
         .allMatches(body)
         .map((match) => int.tryParse(match.group(1) ?? ''))
@@ -185,6 +200,7 @@ class ContactSyncService {
       visitCount: visitCount,
       dayVisitCount: dayVisitCount,
       nightVisitCount: nightVisitCount,
+      memo: memo,
     );
   }
 
@@ -444,6 +460,7 @@ class ContactSyncService {
             'visit_count': candidate.visitCount,
             'day_visit_count': candidate.dayVisitCount,
             'night_visit_count': candidate.nightVisitCount,
+            if (candidate.memo != null) 'memo': candidate.memo,
           };
         }).toList();
 
@@ -475,6 +492,7 @@ class ContactSyncService {
               visitCount: candidate.visitCount,
               dayVisitCount: candidate.dayVisitCount,
               nightVisitCount: candidate.nightVisitCount,
+              memo: candidate.memo,
             );
             final normalizedPhone = _normalize(customer.phone);
             resultByPhone[normalizedPhone] = customer;
