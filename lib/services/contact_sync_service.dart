@@ -2,6 +2,7 @@ import 'package:flutter_contacts/flutter_contacts.dart';
 
 import '../app_config.dart';
 import '../models/customer.dart';
+import 'auth_service.dart';
 import 'phone_service.dart';
 import 'supabase_service.dart';
 
@@ -149,11 +150,11 @@ class ContactSyncService {
     required String phone,
   }) {
     final normalized = displayName.replaceAll(' ', '').trim();
-    if (!normalized.startsWith(AppConfig.contactPrefix)) {
+    if (!normalized.startsWith(AuthService.contactPrefix)) {
       return null;
     }
 
-    final body = normalized.substring(AppConfig.contactPrefix.length);
+    final body = normalized.substring(AuthService.contactPrefix.length);
     final gradeMatch = _gradePattern.firstMatch(body);
     if (gradeMatch == null) {
       return null;
@@ -310,7 +311,7 @@ class ContactSyncService {
         final displayName = contact.displayName?.trim();
         if (displayName == null ||
             displayName.isEmpty ||
-            !displayName.startsWith(AppConfig.contactPrefix) ||
+            !displayName.startsWith(AuthService.contactPrefix) ||
             contact.phones.isEmpty) {
           toSkip++;
           entries.add(
