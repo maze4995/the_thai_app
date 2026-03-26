@@ -334,6 +334,10 @@ class SupabaseService {
     await _client.from('customers').update({'memo': memo}).eq('id', customerId);
   }
 
+  Future<void> updateName(String customerId, String name) async {
+    await _client.from('customers').update({'name': name}).eq('id', customerId);
+  }
+
   Future<void> updatePhone(String customerId, String phone) async {
     await _client.from('customers').update({'phone': phone}).eq('id', customerId);
   }

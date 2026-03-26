@@ -64,9 +64,12 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
     try {
       final memo = _memoController.text.trim();
       await _service.updateMemo(_customer.id, memo);
+      final updated = _customer.copyWith(memo: memo.isNotEmpty ? memo : null);
+      await _service.updateName(_customer.id, updated.contactLabel);
+      await ContactSyncService.syncCustomer(updated);
       if (!mounted) return;
       setState(() {
-        _customer = _customer.copyWith(memo: memo);
+        _customer = updated;
         _isEditingMemo = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
