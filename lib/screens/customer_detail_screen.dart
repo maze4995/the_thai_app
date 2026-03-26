@@ -336,6 +336,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
 
     try {
       final updated = await _service.chargeCoupon(_customer.id, amount);
+      await ContactSyncService.syncCustomer(updated);
       if (!mounted) return;
       setState(() => _customer = updated);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -518,6 +519,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
 
     var editSource = _customer.effectiveSource;
     var editMemberType = _customer.memberType;
+    final nameCtrl = TextEditingController(text: _customer.name);
     final dayCtrl = TextEditingController(text: _customer.dayVisitCount.toString());
     final nightCtrl = TextEditingController(text: _customer.nightVisitCount.toString());
     final phoneCtrl = TextEditingController(text: _customer.phone);
@@ -534,6 +536,17 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // 이름
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(
+                    labelText: '이름',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                    hintText: '비우면 자동 생성',
+                  ),
+                ),
+                const SizedBox(height: 12),
                 // 전화번호
                 TextField(
                   controller: phoneCtrl,
@@ -636,18 +649,23 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
       final newVisitCount = newDay + newNight;
       final newPhone = phoneCtrl.text.trim().isNotEmpty ? phoneCtrl.text.trim() : _customer.phone;
       final newMemo = memoCtrl.text.trim();
+      final customName = nameCtrl.text.trim();
+
+      final name = customName.isNotEmpty
+          ? customName
+          : Customer.buildContactLabel(
+              phone: newPhone,
+              source: editSource,
+              visitCount: newVisitCount,
+              dayVisitCount: newDay,
+              nightVisitCount: newNight,
+              couponBalance: _customer.couponBalance,
+              memo: newMemo.isNotEmpty ? newMemo : null,
+            );
 
       final updated = await _service.updateCustomerProfile(
         customerId: _customer.id,
-        name: Customer.buildContactLabel(
-          phone: newPhone,
-          source: editSource,
-          visitCount: newVisitCount,
-          dayVisitCount: newDay,
-          nightVisitCount: newNight,
-          couponBalance: _customer.couponBalance,
-          memo: newMemo.isNotEmpty ? newMemo : null,
-        ),
+        name: name,
         memberType: editMemberType,
         customerSource: editSource,
         visitCount: newVisitCount,

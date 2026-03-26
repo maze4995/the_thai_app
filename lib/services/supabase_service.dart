@@ -430,14 +430,14 @@ class SupabaseService {
   }
 
   Future<Customer> chargeCoupon(String customerId, int amount) async {
-    final current = await _client
-        .from('customers')
-        .select('coupon_balance')
-        .eq('id', customerId)
-        .single();
+    final current = Customer.fromJson(
+      await _client.from('customers').select().eq('id', customerId).single(),
+    );
+    final newBalance = current.couponBalance + amount;
+    final newName = current.copyWith(couponBalance: newBalance).contactLabel;
     final response = await _client
         .from('customers')
-        .update({'coupon_balance': (current['coupon_balance'] as int) + amount})
+        .update({'coupon_balance': newBalance, 'name': newName})
         .eq('id', customerId)
         .select()
         .single();
