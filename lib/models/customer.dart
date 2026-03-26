@@ -127,6 +127,7 @@ class Customer {
     required int dayVisitCount,
     required int nightVisitCount,
     int couponBalance = 0,
+    String? memo,
   }) {
     final digits = phone.replaceAll(RegExp(r'\D'), '');
     final suffix =
@@ -140,8 +141,10 @@ class Customer {
       _ => 'VV',
     };
     final special = couponBalance > 0 ? ',스페셜' : '';
+    final memoSuffix =
+        (memo != null && memo.isNotEmpty) ? ',$memo' : '';
     final prefix = AuthService.storeName ?? AppConfig.contactPrefix;
-    return '$prefix-$grade-$source$special($dayVisitCount)($nightVisitCount)$suffix';
+    return '$prefix-$grade-$source$special$memoSuffix($dayVisitCount)($nightVisitCount)$suffix';
   }
 
   String get contactLabel {
@@ -152,6 +155,7 @@ class Customer {
       dayVisitCount: dayVisitCount,
       nightVisitCount: nightVisitCount,
       couponBalance: couponBalance,
+      memo: memo,
     );
   }
 }

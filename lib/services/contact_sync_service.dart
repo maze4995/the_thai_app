@@ -1,3 +1,6 @@
+import 'dart:developer' as dev;
+
+import 'package:flutter/services.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 
 import '../app_config.dart';
@@ -36,11 +39,13 @@ class ContactExportSummary {
 }
 
 class ContactImportPreview {
+  final int totalScanned;
   final int toCreate;
   final int toUpdate;
   final int toSkip;
 
   const ContactImportPreview({
+    required this.totalScanned,
     required this.toCreate,
     required this.toUpdate,
     required this.toSkip,
@@ -66,13 +71,13 @@ class ImportedCustomerCandidate {
 }
 
 class PreparedContactImportEntry {
-  final Contact contact;
+  final String contactId;
   final ImportedCustomerCandidate? candidate;
   final bool existsByPhone;
   final bool existsByName;
 
   const PreparedContactImportEntry({
-    required this.contact,
+    required this.contactId,
     required this.candidate,
     required this.existsByPhone,
     required this.existsByName,
@@ -103,6 +108,8 @@ class ContactSyncService {
     '\ub9c8\ud1b5': '\ub9c8\ud1b5',
     '\ub9c8\ud1b5,\uc2a4\ud398\uc15c': '\ub9c8\ud1b5',
     '\ub9c8\ub9f5': '\ub9c8\ub9f5',
+    '\ub9c8\ub9e5': '\ub9c8\ub9e5',
+    '\ub9c8\ubbfc': '\ub9c8\ubbfc',
     '\ud558\uc774': '\ud558\uc774',
     '\ud558\uc774\ud0c0\uc774': '\ud558\uc774',
     '\ub85c\ub4dc': '\ub85c\ub4dc',
@@ -204,76 +211,52 @@ class ContactSyncService {
     );
   }
 
-  static Future<Contact?> _findByPhone(String phone) async {
-    final normalizedTarget = _normalize(phone);
-    final contacts = await FlutterContacts.getAll(
-      properties: {ContactProperty.name, ContactProperty.phone},
-    );
+  static const _nativeChannel = MethodChannel('com.example.the_thai/native_call');
 
-    for (final contact in contacts) {
-      for (final entry in contact.phones) {
-        final number = (entry.normalizedNumber?.isNotEmpty ?? false)
-            ? entry.normalizedNumber
-            : entry.number;
-        if (number != null && _normalize(number) == normalizedTarget) {
-          return contact;
-        }
-      }
-    }
-    return null;
+  static Future<List<Map<String, String>>> _fetchNativeContacts(
+    String prefix,
+  ) async {
+    final raw = await _nativeChannel.invokeListMethod<Map>(
+      'getContactsByPrefix',
+      {'prefix': prefix},
+    );
+    return (raw ?? [])
+        .map((m) => m.map((k, v) => MapEntry(k.toString(), v.toString())))
+        .toList();
   }
 
-  static Future<void> _syncImportedContact(
-    Contact contact,
+  static Future<String?> _findContactIdByPhone(String phone) async {
+    final raw = await _nativeChannel.invokeMapMethod<String, String>(
+      'findContactByPhone',
+      {'phone': _normalize(phone)},
+    );
+    return raw?['id'];
+  }
+
+  static Future<void> _syncContactById(
+    String contactId,
     Customer customer,
   ) async {
-    final existingName = contact.displayName?.trim() ?? '';
-    final primaryPhone = contact.phones.isNotEmpty
-        ? contact.phones.first.number
-        : customer.phone;
-    final normalizedExisting = _normalize(primaryPhone);
-    final normalizedCustomer = _normalize(customer.phone);
-
-    if (existingName == customer.contactLabel &&
-        normalizedExisting == normalizedCustomer) {
-      return;
-    }
-
-    final updated = contact.copyWith(
-      name: Name(first: customer.contactLabel, last: ''),
-      phones: contact.phones.isEmpty
-          ? [Phone(number: customer.phone)]
-          : [
-              Phone(
-                number: customer.phone,
-                label: contact.phones.first.label,
-                normalizedNumber: contact.phones.first.normalizedNumber,
-                isPrimary: contact.phones.first.isPrimary,
-                metadata: contact.phones.first.metadata,
-              ),
-              ...contact.phones.skip(1),
-            ],
-    );
-    await FlutterContacts.update(updated);
+    await _nativeChannel.invokeMethod<void>('updateContactName', {
+      'rawId': contactId,
+      'name': customer.contactLabel,
+    });
   }
 
   static Future<void> syncCustomer(Customer customer) async {
     final granted = await _ensurePermission();
-    if (!granted) {
+    if (!granted) return;
+
+    final contactId = await _findContactIdByPhone(customer.phone);
+    if (contactId != null) {
+      await _syncContactById(contactId, customer);
       return;
     }
 
-    final existing = await _findByPhone(customer.phone);
-    if (existing != null) {
-      await _syncImportedContact(existing, customer);
-      return;
-    }
-
-    final contact = Contact(
+    await FlutterContacts.create(Contact(
       name: Name(first: customer.contactLabel, last: ''),
       phones: [Phone(number: customer.phone)],
-    );
-    await FlutterContacts.create(contact);
+    ));
   }
 
   static bool _shouldImportEntry(
@@ -299,15 +282,15 @@ class ContactSyncService {
     if (!granted) {
       return PreparedContactImport(
         mode: mode,
-        preview: const ContactImportPreview(toCreate: 0, toUpdate: 0, toSkip: 0),
+        preview: const ContactImportPreview(totalScanned: 0, toCreate: 0, toUpdate: 0, toSkip: 0),
         entries: const [],
         customerIndex: const {},
       );
     }
 
-    final contacts = await FlutterContacts.getAll(
-      properties: {ContactProperty.name, ContactProperty.phone},
-    );
+    final contacts = await _fetchNativeContacts(AuthService.contactPrefix);
+    dev.log('[ContactSync] 네이티브 스캔 반환: ${contacts.length}개', name: 'ContactSync');
+
     final customerIndex = await service.getCustomerPhoneIndex();
     final customerNames = (await service.getCustomers())
         .map((customer) => customer.name.trim())
@@ -320,41 +303,37 @@ class ContactSyncService {
     final entries = <PreparedContactImportEntry>[];
 
     for (var i = 0; i < contacts.length; i++) {
-      final contact = contacts[i];
+      final raw = contacts[i];
       onProgress?.call(i + 1, contacts.length, 'preview');
 
       try {
-        final displayName = contact.displayName?.trim();
-        if (displayName == null ||
-            displayName.isEmpty ||
-            !displayName.startsWith(AuthService.contactPrefix) ||
-            contact.phones.isEmpty) {
+        final contactId = raw['id'] ?? '';
+        final displayName = (raw['name'] ?? '').trim();
+        final phone = raw['phone'] ?? '';
+
+        if (displayName.isEmpty || phone.isEmpty) {
           toSkip++;
-          entries.add(
-            PreparedContactImportEntry(
-              contact: contact,
-              candidate: null,
-              existsByPhone: false,
-              existsByName: false,
-            ),
-          );
+          entries.add(PreparedContactImportEntry(
+            contactId: contactId,
+            candidate: null,
+            existsByPhone: false,
+            existsByName: false,
+          ));
           continue;
         }
 
         final candidate = parseCandidate(
           displayName: displayName,
-          phone: contact.phones.first.number,
+          phone: phone,
         );
         if (candidate == null) {
           toSkip++;
-          entries.add(
-            PreparedContactImportEntry(
-              contact: contact,
-              candidate: null,
-              existsByPhone: false,
-              existsByName: false,
-            ),
-          );
+          entries.add(PreparedContactImportEntry(
+            contactId: contactId,
+            candidate: null,
+            existsByPhone: false,
+            existsByName: false,
+          ));
           continue;
         }
 
@@ -362,7 +341,7 @@ class ContactSyncService {
         final existsByPhone = customerIndex.containsKey(normalizedPhone);
         final existsByName = customerNames.contains(displayName);
         final entry = PreparedContactImportEntry(
-          contact: contact,
+          contactId: contactId,
           candidate: candidate,
           existsByPhone: existsByPhone,
           existsByName: existsByName,
@@ -381,20 +360,24 @@ class ContactSyncService {
         entries.add(entry);
       } catch (_) {
         toSkip++;
-        entries.add(
-          PreparedContactImportEntry(
-            contact: contact,
-            candidate: null,
-            existsByPhone: false,
-            existsByName: false,
-          ),
-        );
+        entries.add(PreparedContactImportEntry(
+          contactId: raw['id'] ?? '',
+          candidate: null,
+          existsByPhone: false,
+          existsByName: false,
+        ));
       }
     }
+
+    dev.log(
+      '[ContactSync] 필터 결과: create=$toCreate, update=$toUpdate, skip=$toSkip',
+      name: 'ContactSync',
+    );
 
     return PreparedContactImport(
       mode: mode,
       preview: ContactImportPreview(
+        totalScanned: contacts.length,
         toCreate: toCreate,
         toUpdate: toUpdate,
         toSkip: toSkip,
@@ -464,13 +447,16 @@ class ContactSyncService {
           };
         }).toList();
 
+        dev.log('[ContactSync] batch insert 시도: ${rows.length}개', name: 'ContactSync');
         final created = await service.batchAddCustomers(rows);
+        dev.log('[ContactSync] batch insert 응답: ${created.length}개', name: 'ContactSync');
         for (final customer in created) {
           final normalizedPhone = _normalize(customer.phone);
           resultByPhone[normalizedPhone] = customer;
           customerIndex[normalizedPhone] = customer;
         }
-      } catch (_) {
+      } catch (e) {
+        dev.log('[ContactSync] batch insert 실패, 개별 처리로 전환: $e', name: 'ContactSync');
         var completed = 0;
         for (final entry in toCreate) {
           try {
@@ -497,8 +483,8 @@ class ContactSyncService {
             final normalizedPhone = _normalize(customer.phone);
             resultByPhone[normalizedPhone] = customer;
             customerIndex[normalizedPhone] = customer;
-          } catch (_) {
-            // Continue importing remaining contacts.
+          } catch (e) {
+            dev.log('[ContactSync] 개별 insert 실패 (${entry.candidate?.phone}): $e', name: 'ContactSync');
           }
           onProgress?.call(++completed, toCreate.length, 'create');
         }
@@ -524,6 +510,7 @@ class ContactSyncService {
               visitCount: candidate.visitCount,
               dayVisitCount: candidate.dayVisitCount,
               nightVisitCount: candidate.nightVisitCount,
+              memo: candidate.memo,
             );
             onProgress?.call(++completed, toUpdate.length, 'update');
             return customer;
@@ -550,7 +537,7 @@ class ContactSyncService {
       final entry = syncEntries[i];
       final customer = resultByPhone[_normalize(entry.candidate!.phone)]!;
       try {
-        await _syncImportedContact(entry.contact, customer);
+        await _syncContactById(entry.contactId, customer);
       } catch (_) {
         // Keep DB import successful even when local contact sync fails.
       }

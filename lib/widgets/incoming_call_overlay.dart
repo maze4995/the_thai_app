@@ -194,8 +194,34 @@ class _RegisteredInfo extends StatelessWidget {
             color: customer.couponBalance < 0 ? Colors.red[300] : Colors.white70,
           ),
         ),
-        if (customer.memo != null && customer.memo!.isNotEmpty)
-          Text('\uBA54\uBAA8: ${customer.memo}', style: subStyle),
+        if (customer.memo != null && customer.memo!.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+            decoration: BoxDecoration(
+              color: Colors.amber.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: Colors.amber.withValues(alpha: 0.6)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('📝 ', style: TextStyle(fontSize: 12)),
+                Expanded(
+                  child: Text(
+                    customer.memo!,
+                    style: const TextStyle(
+                      color: Colors.amber,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }

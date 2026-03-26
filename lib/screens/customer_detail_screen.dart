@@ -646,6 +646,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
           dayVisitCount: newDay,
           nightVisitCount: newNight,
           couponBalance: _customer.couponBalance,
+          memo: newMemo.isNotEmpty ? newMemo : null,
         ),
         memberType: editMemberType,
         customerSource: editSource,

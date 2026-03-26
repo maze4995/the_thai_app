@@ -346,6 +346,7 @@ class SupabaseService {
     int? visitCount,
     int? dayVisitCount,
     int? nightVisitCount,
+    String? memo,
   }) async {
     final updates = <String, dynamic>{
       'name': name,
@@ -355,6 +356,7 @@ class SupabaseService {
     if (visitCount != null) updates['visit_count'] = visitCount;
     if (dayVisitCount != null) updates['day_visit_count'] = dayVisitCount;
     if (nightVisitCount != null) updates['night_visit_count'] = nightVisitCount;
+    if (memo != null) updates['memo'] = memo;
 
     final response = await _client
         .from('customers')
@@ -386,6 +388,7 @@ class SupabaseService {
           visitCount: visitCount,
           dayVisitCount: dayVisitCount,
           nightVisitCount: nightVisitCount,
+          memo: memo,
         ),
         phone: phone,
         memberType: memberType,
@@ -415,12 +418,14 @@ class SupabaseService {
         dayVisitCount: mergedDayVisitCount,
         nightVisitCount: mergedNightVisitCount,
         couponBalance: existing.couponBalance,
+        memo: memo ?? existing.memo,
       ),
       memberType: memberType,
       customerSource: customerSource,
       visitCount: mergedVisitCount,
       dayVisitCount: mergedDayVisitCount,
       nightVisitCount: mergedNightVisitCount,
+      memo: memo ?? existing.memo,
     );
   }
 
@@ -530,7 +535,7 @@ class SupabaseService {
         .from('reservations')
         .select()
         .eq('reserved_date', dateStr)
-        .order('reserved_time', ascending: true);
+        .order('reserved_time', ascending: false);
     return (response as List).map((e) => Reservation.fromJson(e)).toList();
   }
 
@@ -768,6 +773,7 @@ class SupabaseService {
     required int visitCount,
     required int dayVisitCount,
     required int nightVisitCount,
+    String? memo,
   }) async {
     final memberType =
         customerSource == '\uB85C\uB4DC' ? '\uB85C\uB4DC\uD68C\uC6D0' : '\uC5B4\uD50C\uD68C\uC6D0';
@@ -782,6 +788,7 @@ class SupabaseService {
       existing.visitCount,
       mergedDay + mergedNight,
     ].reduce((a, b) => a > b ? a : b);
+    final resolvedMemo = memo ?? existing.memo;
 
     return updateCustomerProfile(
       customerId: existing.id,
@@ -792,12 +799,14 @@ class SupabaseService {
         dayVisitCount: mergedDay,
         nightVisitCount: mergedNight,
         couponBalance: existing.couponBalance,
+        memo: resolvedMemo,
       ),
       memberType: memberType,
       customerSource: customerSource,
       visitCount: mergedCount,
       dayVisitCount: mergedDay,
       nightVisitCount: mergedNight,
+      memo: resolvedMemo,
     );
   }
 

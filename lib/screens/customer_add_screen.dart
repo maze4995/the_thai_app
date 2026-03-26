@@ -62,9 +62,11 @@ class _CustomerAddScreenState extends State<CustomerAddScreen> {
 
     setState(() => _isSaving = true);
     try {
+      final rawPhone = _phoneController.text.trim();
+      final normalizedPhone = rawPhone.replaceAll(RegExp(r'[^\d+]'), '');
       final customer = await _service.addCustomer(
         name: _buildPreviewLabel(),
-        phone: _phoneController.text.trim(),
+        phone: normalizedPhone,
         memberType: _memberType,
         customerSource: _customerSource,
         memo: _memoController.text.trim().isEmpty
