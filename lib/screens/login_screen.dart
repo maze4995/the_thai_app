@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/auth_service.dart';
 import 'main_shell.dart';
@@ -18,6 +19,60 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _loading = false;
   String? _errorMessage;
   bool _obscurePassword = true;
+  bool _saveEmail = false;
+  bool _autoLogin = false;
+  bool _initializing = true;
+
+  static const _keySaveEmail = 'login_save_email';
+  static const _keyAutoLogin = 'login_auto_login';
+  static const _keySavedEmail = 'login_saved_email';
+  static const _keySavedPassword = 'login_saved_password';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPreferences();
+  }
+
+  Future<void> _loadPreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    _saveEmail = prefs.getBool(_keySaveEmail) ?? false;
+    _autoLogin = prefs.getBool(_keyAutoLogin) ?? false;
+
+    if (_saveEmail) {
+      _emailController.text = prefs.getString(_keySavedEmail) ?? '';
+    }
+
+    if (_autoLogin) {
+      final savedPassword = prefs.getString(_keySavedPassword) ?? '';
+      if (_emailController.text.isNotEmpty && savedPassword.isNotEmpty) {
+        _passwordController.text = savedPassword;
+        if (mounted) setState(() => _initializing = false);
+        _submit();
+        return;
+      }
+    }
+
+    if (mounted) setState(() => _initializing = false);
+  }
+
+  Future<void> _savePreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keySaveEmail, _saveEmail);
+    await prefs.setBool(_keyAutoLogin, _autoLogin);
+
+    if (_saveEmail || _autoLogin) {
+      await prefs.setString(_keySavedEmail, _emailController.text.trim());
+    } else {
+      await prefs.remove(_keySavedEmail);
+    }
+
+    if (_autoLogin) {
+      await prefs.setString(_keySavedPassword, _passwordController.text);
+    } else {
+      await prefs.remove(_keySavedPassword);
+    }
+  }
 
   Future<void> _submit() async {
     final email = _emailController.text.trim();
@@ -43,6 +98,7 @@ class _LoginScreenState extends State<LoginScreen> {
         _errorMessage = error;
       });
     } else {
+      await _savePreferences();
       try {
         widget.onLoginSuccess();
       } catch (_) {
@@ -65,6 +121,15 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_initializing) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF1a1a2e),
+        body: Center(
+          child: CircularProgressIndicator(color: Color(0xFF8B4513)),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFF1a1a2e),
       body: SafeArea(
@@ -172,7 +237,33 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   onSubmitted: (_) => _submit(),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
+                // 아이디 저장 / 자동 로그인 체크박스
+                Row(
+                  children: [
+                    _buildCheckbox(
+                      label: '아이디 저장',
+                      value: _saveEmail,
+                      onChanged: (v) {
+                        setState(() {
+                          _saveEmail = v ?? false;
+                          if (!_saveEmail) _autoLogin = false;
+                        });
+                      },
+                    ),
+                    const SizedBox(width: 16),
+                    _buildCheckbox(
+                      label: '자동 로그인',
+                      value: _autoLogin,
+                      onChanged: (v) {
+                        setState(() {
+                          _autoLogin = v ?? false;
+                          if (_autoLogin) _saveEmail = true;
+                        });
+                      },
+                    ),
+                  ],
+                ),
                 // 에러 메시지
                 if (_errorMessage != null)
                   Padding(
@@ -223,6 +314,41 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildCheckbox({
+    required String label,
+    required bool value,
+    required ValueChanged<bool?> onChanged,
+  }) {
+    return GestureDetector(
+      onTap: () => onChanged(!value),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 20,
+            height: 20,
+            child: Checkbox(
+              value: value,
+              onChanged: onChanged,
+              activeColor: const Color(0xFF8B4513),
+              checkColor: Colors.white,
+              side: const BorderSide(color: Color(0xFF888888)),
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFFaaaaaa),
+              fontSize: 13,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -1,3 +1,4 @@
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AuthService {
@@ -62,6 +63,10 @@ class AuthService {
   static Future<void> signOut() async {
     storeId = null;
     storeName = null;
+    // 자동 로그인 해제
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('login_auto_login', false);
+    await prefs.remove('login_saved_password');
     await _client.auth.signOut();
   }
 

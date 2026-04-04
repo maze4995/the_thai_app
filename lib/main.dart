@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
@@ -342,23 +344,41 @@ class _AuthGate extends StatefulWidget {
 class _AuthGateState extends State<_AuthGate> {
   bool _loading = true;
   bool _authenticated = false;
+  late final StreamSubscription<AuthState> _authSub;
 
   @override
   void initState() {
     super.initState();
-    _checkSession();
+    _authSub = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      final session = data.session;
+      final event = data.event;
+
+      if (event == AuthChangeEvent.signedIn ||
+          event == AuthChangeEvent.tokenRefreshed ||
+          event == AuthChangeEvent.initialSession) {
+        if (session != null) {
+          _handleAuthenticated();
+        } else if (event == AuthChangeEvent.initialSession) {
+          // 저장된 세션이 없는 경우
+          if (mounted) setState(() { _loading = false; _authenticated = false; });
+        }
+      } else if (event == AuthChangeEvent.signedOut) {
+        if (mounted) setState(() { _loading = false; _authenticated = false; });
+      }
+    });
   }
 
-  Future<void> _checkSession() async {
-    if (AuthService.isLoggedIn) {
-      // 세션은 있지만 storeId가 없으면 로드
-      if (AuthService.storeId == null) {
-        await AuthService.loadStoreId();
-      }
-      if (mounted) setState(() { _loading = false; _authenticated = true; });
-    } else {
-      if (mounted) setState(() { _loading = false; _authenticated = false; });
+  Future<void> _handleAuthenticated() async {
+    if (AuthService.storeId == null) {
+      await AuthService.loadStoreId();
     }
+    if (mounted) setState(() { _loading = false; _authenticated = true; });
+  }
+
+  @override
+  void dispose() {
+    _authSub.cancel();
+    super.dispose();
   }
 
   void _onLoginSuccess() {
